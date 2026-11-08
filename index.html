@@ -59,100 +59,67 @@ a{color:var(--gold);text-align:center}
 </main>
 <script>
 // shortcut: Marathi names are a best guess; swap here if your family calls them something else
-// voc = what your voice gets rebuilt from: car = carrier sound, rate = crackle pops/sec, dry = share of real voice kept
 const CRACKERS = {
-  baan:     {emoji:'🚀', mr:'रॉकेट', voc:{car:'hiss',lo:300,dry:.22},
-    lines:['Words launched. Landed on the neighbour’s balcony.','Left the atmosphere. Nobody was listening anyway.']},
-  bhuinala: {emoji:'🎇', mr:'भुईनळा', voc:{car:'hiss',rate:70,n:.6,dry:.2},
-    lines:['Sprayed opinions in every direction.','Like your WhatsApp forwards. Everywhere. At once.']},
-  lavangi:  {emoji:'🧨', mr:'लवंगी', voc:{car:'hiss',rate:28,n:.06,dry:.2},
-    lines:['Said it 100 times. Like Aai.','Every word a tiny explosion of nagging.']},
-  sutli:    {emoji:'💣', mr:'सुतळी', voc:{car:'hiss',lo:900,dry:.18},
-    lines:['Long fuse. Short temper.','Silence… then BOOM. Classic Baba.']},
-  chakra:   {emoji:'🌀', mr:'भुईचक्र', voc:{car:'whirl',dry:.22},
-    lines:['Going in circles. As usual.','Same argument, spinning since 2009.']},
-  fulbaji:  {emoji:'✨', mr:'फुलबाजी', voc:{car:'hiss',lo:1200,rate:40,n:.3,dry:.25},
-    lines:['Sparkly. Harmless. Like your threats.','Safe for kids. Zero damage done.']},
-  tikli:    {emoji:'🔴', mr:'टिकली', voc:{car:'hiss',lo:800,rate:14,n:.04,dry:.3},
-    lines:['That’s it? That’s the voice?','Cap-gun energy. Try harder.']},
-  saap:     {emoji:'🐍', mr:'सापगोळी', voc:{car:'brown',hi:2500,dry:.25},
-    lines:['Grows slowly. Smells bad. Like gossip.','All smoke. No fire.']},
-  skyshot:  {emoji:'🎆', mr:'स्काय शॉट', voc:{car:'hiss',rate:8,n:.5,dry:.2},
-    lines:['Every syllable thinks it’s the main character.','Five shots of pure drama.']},
-  atom:     {emoji:'☢️', mr:'ॲटम बॉम्ब', voc:{car:'brown',hi:3000,dry:.18},
-    lines:['Building society has been evacuated.','Pollution board would like a word.']},
+  baan:     {emoji:'🚀', mr:'रॉकेट',     lines:['शब्द थेट शेजाऱ्यांच्या गॅलरीत पोहोचले.','आवाज आकाशात गेला. ऐकलं कोणीच नाही.']},
+  bhuinala: {emoji:'🎇', mr:'भुईनळा',    lines:['तोंड उघडलं की नुसता फवारा!','मतं सगळीकडे उडवली. व्हॉट्सॲप फॉरवर्डसारखी.']},
+  lavangi:  {emoji:'🧨', mr:'लवंगी',     lines:['एकच गोष्ट शंभर वेळा. अगदी आईसारखी.','प्रत्येक शब्द म्हणजे छोटीशी कटकट.']},
+  sutli:    {emoji:'💣', mr:'सुतळी',     lines:['वात लांब, डोकं गरम.','आधी शांतता… मग धडाम! टिपिकल बाबा.']},
+  chakra:   {emoji:'🌀', mr:'भुईचक्र',   lines:['नेहमीसारखं गोल गोल फिरतंय.','तेच भांडण, २००९ पासून फिरतंय.']},
+  fulbaji:  {emoji:'✨', mr:'फुलबाजी',   lines:['चमक भारी, धोका शून्य. तुमच्या धमक्यांसारखा.','लहान मुलांसाठी सुरक्षित आवाज.']},
+  tikli:    {emoji:'🔴', mr:'टिकली',     lines:['बस्स? एवढाच आवाज?','टिकली लेव्हल. जरा जोर लावा!']},
+  saap:     {emoji:'🐍', mr:'सापगोळी',   lines:['हळूहळू वाढतो, वास भयंकर. गॉसिपसारखा.','नुसता धूर, आग नाहीच.']},
+  skyshot:  {emoji:'🎆', mr:'स्काय शॉट', lines:['प्रत्येक शब्दाला हिरो व्हायचंय.','पाच फेऱ्या, नुसतं नाटक.']},
+  atom:     {emoji:'☢️', mr:'ॲटम बॉम्ब', lines:['सोसायटी रिकामी करण्यात आली आहे.','प्रदूषण मंडळाला तुमच्याशी बोलायचंय.']},
 };
-// sarcastic verdicts on how loud you were, quietest first
-const VERDICT=['even the dog didn’t wake up','Aai still can’t hear you','neighbours noticed. Barely.','society WhatsApp group is typing…','windows cracked. Literally.'];
+// how loud you were, quietest first
+const VERDICT=['कुत्रासुद्धा उठला नाही','आईला अजून ऐकू आलं नाही','शेजाऱ्यांनी कसंबसं ऐकलं','सोसायटीचा ग्रुप टाइप करतोय…','खिडक्यांच्या काचा फुटल्या. खरंच.'];
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rnd = (a,b) => a+Math.random()*(b-a);
-let type = 'baan', voice = null, ons = [], who = '', video = null, voiced = {}, power = 5, quip = '';
+let type = 'baan', voice = null, ons = [], hot = [], peak = 0, who = '', video = null, power = 5, quip = '';
 
 // ---------- audio ----------
-// everything goes through an outdoor-echo bus, then a limiter
-let ac, master, fx, noise;
+// every sound below is cut from the recorded voice itself; no synth noise anywhere
+let ac, master, fx, CLIP;
 function AC(){
   if(!ac){
     ac = new (window.AudioContext||webkitAudioContext)();
-    master = ac.createDynamicsCompressor(); // used as a limiter so bangs never clip
+    master = ac.createDynamicsCompressor(); // limiter so booms never clip
     master.threshold.value=-3; master.knee.value=0; master.ratio.value=20; master.attack.value=.001; master.release.value=.12;
     master.connect(ac.destination);
     fx = ac.createGain(); fx.connect(master);
-    const rv = ac.createConvolver(), n = ac.sampleRate*1.8, ir = ac.createBuffer(2,n,ac.sampleRate);
+    // outdoor echo, so voice-booms sound like they went off in the street
+    const rv = ac.createConvolver(), n = ac.sampleRate*2, ir = ac.createBuffer(2,n,ac.sampleRate);
     for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,4)}
-    rv.buffer = ir; const wet = ac.createGain(); wet.gain.value=.3; fx.connect(rv).connect(wet).connect(master);
-    noise = ac.createBuffer(1, ac.sampleRate*3, ac.sampleRate);
-    const d = noise.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    rv.buffer = ir; const wet = ac.createGain(); wet.gain.value=.35; fx.connect(rv).connect(wet).connect(master);
+    CLIP = Float32Array.from({length:2049},(_,i)=>Math.tanh((i/1024-1)*25));
   }
   return ac;
 }
-function play(buf,t,dest,off=0,dur){const s=ac.createBufferSource();s.buffer=buf;s.connect(dest);s.start(t,off,dur);return s}
-function env(t,a,peak,hold,rel,dest=fx){const g=ac.createGain(),p=g.gain;p.setValueAtTime(0,t);p.linearRampToValueAtTime(peak,t+a);p.setValueAtTime(peak,t+a+hold);p.exponentialRampToValueAtTime(.001,t+a+hold+rel);g.connect(dest);return g}
-function filt(type,f,q=1,to){const n=ac.createBiquadFilter();n.type=type;n.frequency.value=f;n.Q.value=q;if(to)n.connect(to);return n}
-function hiss(t,dur,type,f,q,gain,a=.08){const n=filt(type,f,q,env(t,a,gain,Math.max(0,dur-a-.15),.15));play(noise,t,n,Math.random(),dur+.1);return n}
-function thump(t,size,f0=110){const o=ac.createOscillator();o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(35,t+.25);o.connect(env(t,.002,size,0,.08+.2*size));o.start(t);o.stop(t+.6)}
-// sharp broadband crack + low body; the reverb bus adds the outdoor echo
-function crack(t,size){play(noise,t,filt('highpass',350,.7,env(t,.001,size,.004,.04+.16*size)),Math.random()*2,.5);thump(t,size*.8)}
-function crackle(t,dur,n,size){for(let i=0;i<n;i++)crack(t+Math.random()*dur,size*rnd(.4,1))}
-// your words, spoken by the cracker (see vocode)
-function speak(t,dest=fx){return play(voiced[type],t,dest)}
-
-// carrier = the raw cracker sound the voice gets carved out of
-function carrier(c,len,sr){
-  const d=new Float32Array(len);let b=0;
-  for(let i=0;i<len;i++){const w=Math.random()*2-1;
-    if(c.car==='brown'){b=(b+.02*w)/1.02;d[i]=b*4}else d[i]=w*(c.n??1);
-    if(c.car==='whirl')d[i]*=.5+.5*Math.sin(2*Math.PI*11*i/sr)}
-  if(c.rate){const step=sr/c.rate,L=sr*.004;
-    for(let p=Math.random()*step;p<len;p+=step*rnd(.3,1.7)){const a=rnd(.5,1);for(let j=0;j<L&&p+j<len;j++)d[p+j|0]+=a*(Math.random()*2-1)*(1-j/L)}}
-  return d;
+function filt(type,f,to){const n=ac.createBiquadFilter();n.type=type;n.frequency.value=f;n.connect(to);return n}
+function clip(to){const w=ac.createWaveShaper();w.curve=CLIP;w.connect(to);return w}
+// one slice of the voice: from offset `off`, lasting `len` real seconds at playback `rate`
+function grain(t,off,len,rate,gain,dest=fx,a=.004){
+  const s=ac.createBufferSource(),g=ac.createGain(),p=g.gain;s.buffer=voice;s.playbackRate.value=rate;
+  p.setValueAtTime(0,t);p.linearRampToValueAtTime(gain,t+Math.min(a,len/2));p.exponentialRampToValueAtTime(.001,t+len);
+  s.connect(g).connect(dest);s.start(t,Math.max(0,Math.min(off,voice.duration-.01)));s.stop(t+len+.02);return s;
 }
-// channel vocoder: the voice's loudness in each band shapes the cracker sound in that band, so the cracker "says" the words
-const ABS=Float32Array.from({length:1025},(_,i)=>Math.abs(i/512-1));
-async function vocode(v,c){
-  const sr=v.sampleRate,len=v.length,oc=new (window.OfflineAudioContext||webkitOfflineAudioContext)(1,len,sr);
-  const cb=oc.createBuffer(1,len,sr);cb.getChannelData(0).set(carrier(c,len,sr));
-  const vs=oc.createBufferSource(),cs=oc.createBufferSource();vs.buffer=v;cs.buffer=cb;
-  const lo=c.lo||150,hi=c.hi||7000,N=18;
-  for(let i=0;i<N;i++){
-    const f=lo*Math.pow(hi/lo,i/(N-1)),bp=()=>{const b=oc.createBiquadFilter();b.type='bandpass';b.frequency.value=f;b.Q.value=5;return b};
-    const r=oc.createWaveShaper(),lp=oc.createBiquadFilter(),g=oc.createGain();r.curve=ABS;lp.type='lowpass';lp.frequency.value=30;g.gain.value=0;
-    vs.connect(bp()).connect(r).connect(lp).connect(g.gain);cs.connect(bp()).connect(g).connect(oc.destination);
-  }
-  vs.start();cs.start();
-  const o=(await oc.startRendering()).getChannelData(0);let m=0;for(const x of o)m=Math.max(m,Math.abs(x));
-  const vd=v.getChannelData(0),out=ac.createBuffer(1,len,sr),od=out.getChannelData(0),dry=c.dry;
-  for(let i=0;i<len;i++)od[i]=o[i]/(m||1)*.95*(1-dry)+vd[i]*dry;
-  return out;
+const hotSpot = () => hot[Math.random()*hot.length|0];
+// BOOM: your loudest moment slowed ~8x into a thud, plus a clipped snap of it for the crack
+function boom(t,size){
+  grain(t,peak,.35+.5*size,.13,size*1.1,filt('lowpass',500,fx),.003);
+  grain(t,peak,.03+.02*size,1,size*.5,clip(filt('highpass',400,fx)),.001);
 }
-// 1..10 from how loud the raw recording was, before normalising
-function loudness(buf){
-  const d=buf.getChannelData(0),n=buf.sampleRate*.02|0,r=[];
-  for(let i=0;i+n<=d.length;i+=n){let s=0;for(let j=i;j<i+n;j++)s+=d[j]*d[j];r.push(Math.sqrt(s/n))}
-  r.sort((a,b)=>b-a);const top=r.slice(0,Math.max(1,r.length/4|0)),rms=top.reduce((a,b)=>a+b,0)/top.length;
-  return Math.max(1,Math.min(10,Math.round((20*Math.log10(rms+1e-9)+42)/3)));
-}
+// crackle: tiny clipped crumbs of the voice
+function crackle(t,dur,n,size){const h=filt('highpass',1200,fx),c=clip(h);for(let i=0;i<n;i++)grain(t+Math.random()*dur,hotSpot(),rnd(.004,.014),rnd(1.5,3),size*rnd(.3,1),c,.001)}
+// spray: a dense cloud of short voice grains, sped up, airy
+function spray(t,dur,perSec,rate,hp,gain){const h=filt('highpass',hp,fx);for(let i=0;i<dur*perSec;i++)grain(t+Math.random()*dur,hotSpot(),rnd(.03,.07),rate*rnd(.8,1.25),gain,h,.01)}
+// whistle: your vowel looped in overlapping grains, pitch following rate(k), k = 0..1
+function whistle(t,dur,rate,gain,dest=fx){for(let x=0;x<dur;x+=.025)grain(t+x,peak+rnd(-.02,.02),.07,rate(x/dur),gain,dest,.03)}
+// stretch: the whole phrase smeared out over dur, pitch following rate(k)
+function stretch(t,dur,rate,gain,dest=fx){for(let x=0;x<dur;x+=.04)grain(t+x,voice.duration*x/dur,.12,rate(x/dur),gain,dest,.05)}
+// the punchline: the actual words, re-pitched
+function phrase(t,rate,gain,dest=fx){const s=ac.createBufferSource(),g=ac.createGain();s.buffer=voice;s.playbackRate.value=rate;g.gain.value=gain;s.connect(g).connect(dest);s.start(t);return voice.duration/rate}
 const at = (t,fn) => setTimeout(fn, Math.max(0,(t-ac.currentTime)*1000));
 
 // cut the silence around the voice, keep soft starts like "sh"
@@ -163,71 +130,73 @@ function trim(buf){
   const n=ac.createBuffer(1,Math.max(1,b-a),sr),nd=n.getChannelData(0),k=m>0?.95/m:1;
   for(let i=0;i<nd.length;i++)nd[i]=d[a+i]*k;return n;
 }
-// syllable starts (seconds), so pops land on the words
-function onsets(buf){
-  const d=buf.getChannelData(0),n=buf.sampleRate*.02|0,r=[];
-  for(let i=0;i+n<=d.length;i+=n){let s=0;for(let j=i;j<i+n;j++)s+=d[j]*d[j];r.push(Math.sqrt(s/n))}
-  const m=Math.max(...r,1e-9),o=[0];let low=false;
+function frames(buf){const d=buf.getChannelData(0),n=buf.sampleRate*.02|0,r=[];
+  for(let i=0;i+n<=d.length;i+=n){let s=0;for(let j=i;j<i+n;j++)s+=d[j]*d[j];r.push(Math.sqrt(s/n))}return r}
+// syllable starts (seconds), the loudest spot, and where the voice is loud enough to cut grains from
+function analyse(buf){
+  const r=frames(buf),m=Math.max(...r,1e-9),o=[0];let low=false;
   for(let i=1;i<r.length;i++){if(r[i]<m*.15)low=true;else if(low&&r[i]>m*.3&&i*.02-o[o.length-1]>.15){o.push(i*.02);low=false}}
-  return o;
+  ons=o;peak=r.indexOf(m)*.02;hot=r.flatMap((x,i)=>x>m*.35?[i*.02]:[]);if(!hot.length)hot=[peak];
+}
+// 1..10 from how loud the raw recording was, before normalising
+function loudness(buf){
+  const r=frames(buf).sort((a,b)=>b-a),top=r.slice(0,Math.max(1,r.length/4|0)),rms=top.reduce((a,b)=>a+b,0)/top.length;
+  return Math.max(1,Math.min(10,Math.round((20*Math.log10(rms+1e-9)+42)/3)));
 }
 
 // each returns its total length in seconds; V = voice length
 const FX = {
-  baan(t,V){ // fuse, then your words whoosh upwards and pop
-    const f=.3;hiss(t,f,'bandpass',5000,2,.15,.02);
-    const s=speak(t+f);s.playbackRate.setValueAtTime(1,t+f);s.playbackRate.linearRampToValueAtTime(1.25,t+f+V);
-    hiss(t+f,V/1.1,'bandpass',2500,1,.12);const e=t+f+V/1.12;crack(e+.05,.9);crackle(e+.25,.5,6,.12);
-    vis.rocket(t,f,V/1.12+.05);return e-t+1.1;
+  baan(t,V){ // your vowel screams upward, pops, and the words squeak back down
+    const f=.35,fly=Math.min(1.6,Math.max(.9,V*.8));crackle(t,f,12,.3);
+    whistle(t+f,fly,k=>1.4+2.4*k*k,.45);const e=t+f+fly;boom(e,.9);crackle(e+.08,.6,30,.45);
+    phrase(e+.45,1.55,.35);vis.rocket(t,f,fly);return f+fly+.45+V/1.55+.6;
   },
-  bhuinala(t,V){ // your words come out as a spray of fizz
-    const d=V+.6;hiss(t,d,'bandpass',2600,.6,.18,.15);crackle(t+.2,d-.3,Math.round(d*8),.06);
-    speak(t+.15);vis.fountain(t,d);return d+.5;
+  bhuinala(t,V){ // your voice, sprayed out as a fountain of fizz, whispering the words through it
+    const d=Math.max(2,V+.6);spray(t,d,140,1.9,1500,.18);crackle(t+.1,d,d*25,.3);
+    phrase(t+.3,1,.3,filt('highpass',1400,fx));vis.fountain(t,d);return d+.6;
   },
-  lavangi(t,V){ // your words as a string of pops, a bigger one on every syllable
-    const s=t+.1;ons.forEach(o=>{crack(s+o-.02,.55);vis.pop(s+o-.02,.6)});speak(s);
-    for(let i=0;i<6;i++){const tt=s+V+.05+i*rnd(.06,.13);crack(tt,rnd(.4,.8));vis.pop(tt,.5)}
-    vis.hold(t,V+1,(W,H)=>({e:'🧨',x:W/2,y:G(H),s:H*.1}));return V+1.2;
+  lavangi(t,V){ // each pop is one of your syllables, sped up and snapped
+    let tt=t+.1,i=0;
+    for(;i<14;i++){const o=ons[i%ons.length];grain(tt,o,.06,1.5,.8,clip(filt('highpass',300,fx)),.001);boom(tt,.25);vis.pop(tt,.5);tt+=rnd(.07,.15)}
+    boom(tt+.05,.9);vis.pop(tt+.05,1.4);
+    vis.hold(t,tt-t+.4,(W,H)=>({e:'🧨',x:W/2,y:G(H),s:H*.1}));return tt-t+1.2;
   },
-  sutli(t,V){ // your words burn down the fuse… then BOOM
-    const f=.3;hiss(t,f,'bandpass',5000,2,.2,.02);speak(t+f);crackle(t+f,V,Math.round(V*5),.04);
-    const b=t+f+V+.05;crack(b,1.6);thump(b,1.4,80);
-    vis.fuse(t,f+V,'💣');vis.flash(b);vis.burst(b,.5,.75,1.4,80);return b-t+1.3;
+  sutli(t,V){ // fizzing fuse made of your voice, BOOM, then your words, slow and huge
+    const f=1;crackle(t,f,45,.2);spray(t,f,50,2.6,3000,.1);
+    const b=t+f;boom(b,1.7);const p=phrase(b+.2,.55,.55,filt('lowpass',2500,fx));
+    vis.fuse(t,f,'💣');vis.flash(b);vis.burst(b,.5,.75,1.4,80);return f+.2+p+.8;
   },
-  chakra(t,V){ // your words spin round and round
-    const d=V+.5,p=ac.createStereoPanner(),o=ac.createOscillator(),g=ac.createGain();
-    p.connect(fx);o.frequency.value=3;g.gain.value=.6;o.connect(g).connect(p.pan);o.start(t);o.stop(t+d);
-    hiss(t,d,'bandpass',2200,3,.12,.1);speak(t+.15,p);vis.spin(t,d);return d+.4;
+  chakra(t,V){ // your vowel whirring round and round
+    const d=Math.max(2,V+.5),p=ac.createStereoPanner(),o=ac.createOscillator(),g=ac.createGain();
+    p.connect(fx);o.frequency.value=3;g.gain.value=.7;o.connect(g).connect(p.pan);o.start(t);o.stop(t+d);
+    whistle(t,d,k=>2.2+.9*Math.sin(k*d*2*Math.PI*5),.35,p);crackle(t,d,d*15,.25);vis.spin(t,d);return d+.6;
   },
-  fulbaji(t,V){ // your words as a sparkly sizzle
-    const d=V+.6;hiss(t,d,'highpass',5000,1,.1,.1);crackle(t,d,Math.round(d*12),.04);
-    speak(t+.15);vis.sparkler(t,d);return d+.4;
+  fulbaji(t,V){ // fine crumbs of your voice sparkling, words whispered high
+    const d=V+1;crackle(t,d,d*55,.18);phrase(t+.2,1.12,.22,filt('highpass',2500,fx));vis.sparkler(t,d);return d+.5;
   },
-  tikli(t,V){ // your words as cap snaps
-    const s=t+.1;ons.forEach(o=>{crack(s+o-.02,.4);vis.pop(s+o-.02,.35)});speak(s);
+  tikli(t,V){ // a tiny cap snap made from each syllable
+    const s=t+.1;ons.forEach(o=>{grain(s+o,o,.04,1.3,.7,clip(filt('highpass',800,fx)),.001);vis.pop(s+o,.35)});
     vis.hold(t,V+.4,(W,H)=>({e:'🔴',x:W/2,y:G(H),s:H*.07}));return V+.7;
   },
-  saap(t,V){ // your words smoulder low and slow
-    const d=V+.5,s=speak(t+.15);s.playbackRate.value=.85;hiss(t,d/.85,'lowpass',900,.7,.15,.2);
-    vis.snake(t,d/.85);return d/.85+.4;
+  saap(t,V){ // your words oozing out slowly and sadly, like the snake
+    const d=V*2.6;stretch(t,d,k=>.75-.25*k,.55,filt('lowpass',1500,fx));spray(t,d,25,.6,200,.06);vis.snake(t,d);return d+.6;
   },
-  skyshot(t,V){ // a shell launches on every syllable, bursts after
+  skyshot(t,V){ // each syllable: a low thoomp up, then a voice-boom burst
     const s=t+.1,shots=ons.length>2?ons:[0,V/3,V*2/3];
-    shots.forEach(o=>{thump(s+o-.05,.5,70);crack(s+o+.4,.8);vis.shell(s+o-.05,.45)});
-    speak(s);vis.hold(t,V+.9,(W,H)=>({f:box,x:W/2,y:G(H),s:H*.12}));return V+1.6;
+    shots.forEach(o=>{grain(s+o,o,.2,.35,.7,filt('lowpass',600,fx));whistle(s+o,.35,k=>2+1.5*k,.18);boom(s+o+.4,.75);crackle(s+o+.5,.5,15,.3);vis.shell(s+o,.4)});
+    vis.hold(t,V+1,(W,H)=>({f:box,x:W/2,y:G(H),s:H*.12}));return V+1.7;
   },
-  atom(t,V){ // rumbling build, the biggest boom, and your words rumble out of the cloud
-    const f=.8,r=hiss(t,f,'lowpass',120,1,.8,f-.15);r.frequency.linearRampToValueAtTime(600,t+f);
-    crack(t+f,2);crack(t+f+.05,1.3);thump(t+f,1.6,60);speak(t+f+.1);crackle(t+f+.1+V,.6,10,.15);
-    vis.fuse(t,f,'☢️',true);vis.flash(t+f);vis.burst(t+f,.5,.7,2,200);return f+V+1.3;
+  atom(t,V){ // your voice sucked down into a rumble, the biggest boom, then the words echo out of the cloud
+    const f=1.2;stretch(t,f,k=>.22+.5*k,.7,filt('lowpass',900,fx));
+    const b=t+f;boom(b,2.2);boom(b+.06,1.4);crackle(b+.2,1.2,50,.4);const p=phrase(b+.35,.62,.6);
+    vis.fuse(t,f,'☢️',true);vis.flash(b);vis.burst(b,.5,.7,2,200);return f+.35+p+1;
   },
 };
-async function light(){
+function verdict(){return VERDICT[Math.min(4,(power-1)/2|0)]}
+function light(){
   AC().resume();if(!voice)return 0;
   const btns=document.querySelectorAll('#light1,#light2,#make');btns.forEach(b=>b.disabled=true);
-  if(!voiced[type])voiced[type]=await vocode(voice,CRACKERS[type].voc);
-  const L=CRACKERS[type].lines;quip=L[Math.random()*L.length|0];
-  msg(quip);
+  const L=CRACKERS[type].lines;quip=L[Math.random()*L.length|0];msg(quip);
   const d=FX[type](ac.currentTime+.3,voice.duration)+.3;
   setTimeout(()=>btns.forEach(b=>b.disabled=false),d*1000);
   return d;
@@ -299,7 +268,7 @@ const vis={
   cx.font=`700 ${W*.065}px system-ui,sans-serif`;cx.fillStyle='#ffb627';cx.fillText('🪔 शुभ दीपावली 🪔',W/2,H*.07);
   cx.font=`600 ${W*.05}px system-ui,sans-serif`;cx.fillStyle='#fff4e0';cx.fillText(`${who?who+' चा ':''}${c.mr} ${c.emoji}`,W/2,H*.95);
   if(quip){cx.font=`italic 500 ${W*.04}px system-ui,sans-serif`;cx.fillStyle='#d8d2ca';cx.fillText(`“${quip}”`,W/2,H*.13,W*.92);
-    cx.font=`700 ${W*.04}px system-ui,sans-serif`;cx.fillStyle='#ff4d3d';cx.fillText(`Voice intensity 🔥 ${power}/10 — ${VERDICT[Math.min(4,(power-1)/2|0)]}`,W/2,H*.18,W*.92)}
+    cx.font=`700 ${W*.04}px system-ui,sans-serif`;cx.fillStyle='#ff4d3d';cx.fillText(`आवाजाची ताकद 🔥 ${power}/10 — ${verdict()}`,W/2,H*.18,W*.92)}
   requestAnimationFrame(draw);
 })();
 
@@ -322,7 +291,7 @@ async function record(){
   try{await setVoice(new Blob(chunks,{type:r.mimeType}))}catch{msg('Could not read that recording, try again');return}
   show('s-ready');msg('Nice! Try other crackers, then make the video');light();
 }
-async function setVoice(blob){const raw=await AC().decodeAudioData(await blob.arrayBuffer());power=loudness(raw);voice=trim(raw);ons=onsets(voice);voiced={}}
+async function setVoice(blob){const raw=await AC().decodeAudioData(await blob.arrayBuffer());power=loudness(raw);voice=trim(raw);analyse(voice)}
 
 // ---------- video ----------
 async function makeVideo(){
@@ -333,8 +302,7 @@ async function makeVideo(){
   const vt=cv.captureStream(30).getVideoTracks()[0],st=new MediaStream([vt,...dest.stream.getAudioTracks()]);
   const r=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:3e6,audioBitsPerSecond:128000}),ch=[];r.ondataavailable=e=>ch.push(e.data);
   $('#make').disabled=true;msg('🎬 Recording your video…');
-  if(!voiced[type])voiced[type]=await vocode(voice,CRACKERS[type].voc); // render first so the video doesn't start with a pause
-  r.start();await sleep(400);const d=await light();await sleep(d*1000+300);
+  r.start();await sleep(400);const d=light();await sleep(d*1000+300);
   r.stop();await new Promise(res=>r.onstop=res);master.disconnect(dest);vt.stop();
   const ext=mime.includes('mp4')?'mp4':'webm';
   video=new File(ch,`diwali-${type}-${(who||'voice').replace(/\W+/g,'')||'voice'}.${ext}`,{type:mime.split(';')[0]});
