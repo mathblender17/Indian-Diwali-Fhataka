@@ -4,34 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Voice Fatake</title>
-<meta name="description" content="Record 2 seconds of your voice, stuff it in a firecracker, send it as a Diwali gift.">
-<meta property="og:title" content="🪔 Someone sent you a voice firecracker!">
-<meta property="og:description" content="Tap to light it. Happy Diwali!">
+<meta name="description" content="Record 2 seconds of your voice, stuff it in a firecracker, send it as a Diwali video.">
+<meta property="og:title" content="🪔 Voice Fatake — put your voice in a firecracker">
+<meta property="og:description" content="Record 2 seconds, pick a cracker, send the video. Happy Diwali!">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧨</text></svg>">
 <style>
 :root{--bg:#120a1f;--ink:#fff4e0;--dim:#b9a7c9;--gold:#ffb627;--red:#ff4d3d;--chip:#24163a}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%;background:var(--bg);color:var(--ink);font:16px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
-main{height:100dvh;max-width:480px;margin:auto;display:grid;grid-template-rows:auto 1fr auto auto auto;gap:12px;padding:12px 16px max(16px,env(safe-area-inset-bottom))}
+main{height:100dvh;max-width:480px;margin:auto;display:grid;grid-template-rows:auto 1fr auto auto auto;gap:10px;padding:12px 16px max(14px,env(safe-area-inset-bottom))}
 header{display:flex;align-items:baseline;gap:8px}
 header b{font-size:22px;color:var(--gold)}header span{color:var(--dim);font-size:14px}
-canvas{width:100%;height:100%;min-height:0;border-radius:18px;background:radial-gradient(ellipse at 50% 120%,#3a1d4f,#0b0614 70%)}
-#msg{text-align:center;min-height:1.3em;font-size:17px}
-#crackers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-#crackers button{background:var(--chip);border:2px solid transparent;border-radius:14px;padding:8px 4px;color:var(--ink);display:grid;gap:2px;justify-items:center}
-#crackers button i{font-style:normal;font-size:30px}
-#crackers button b{font-size:15px}#crackers button small{color:var(--dim);font-size:11px}
+canvas{width:100%;height:100%;min-height:0;border-radius:18px;background:#0b0614}
+#msg{text-align:center;min-height:1.3em;font-size:16px}
+#crackers{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+#crackers button{background:var(--chip);border:2px solid transparent;border-radius:12px;padding:6px 2px;color:var(--ink);display:grid;gap:1px;justify-items:center;min-width:0}
+#crackers button i{font-style:normal;font-size:24px;line-height:1.1}
+#crackers button b{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 #crackers button[aria-pressed=true]{border-color:var(--gold);background:#3b2410}
-.row{display:flex;gap:8px}
+.col{display:grid;gap:8px}.row{display:flex;gap:8px}
 button{font:inherit;cursor:pointer}
-.big{flex:1;border:0;border-radius:16px;padding:16px 10px;font-size:18px;font-weight:700;background:var(--gold);color:#2a1300}
+.big{flex:1;border:0;border-radius:16px;padding:15px 10px;font-size:17px;font-weight:700;background:var(--gold);color:#2a1300}
 .big.alt{background:var(--chip);color:var(--ink)}
 .big:disabled{opacity:.5}
 #rec{position:relative;overflow:hidden}
 #rec span{position:absolute;inset:0;background:var(--red);transform-origin:left;transform:scaleX(0)}
 #rec em{position:relative;font-style:normal}
 input{flex:1;min-width:0;border:2px solid var(--chip);background:transparent;color:var(--ink);border-radius:14px;padding:0 12px;font:inherit}
-a{color:var(--gold)}
+a{color:var(--gold);text-align:center}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -41,27 +41,39 @@ a{color:var(--gold)}
   <canvas id="sky" aria-label="Firecracker preview"></canvas>
   <p id="msg" aria-live="polite">Pick a cracker, record 2 seconds</p>
   <div id="crackers" role="group" aria-label="Firecracker"></div>
-  <div id="send-ui" class="row-col">
+  <div id="send-ui">
     <div class="row" id="s-rec"><button class="big" id="rec"><span></span><em>🎙 Record 2 sec</em></button></div>
-    <div id="s-ready" hidden style="display:grid;gap:8px">
-      <div class="row"><button class="big alt" id="redo">🎙 Redo</button><button class="big" id="light1">🔥 Light it</button></div>
-      <div class="row"><input id="name" placeholder="Your name" maxlength="24" aria-label="Your name"><button class="big" id="send" style="flex:0 0 auto">🎁 Send</button></div>
+    <div class="col" id="s-ready" hidden>
+      <div class="row"><button class="big alt" id="redo">🎙 Redo</button><button class="big alt" id="light1">🔥 Light it</button></div>
+      <div class="row"><input id="name" placeholder="Your name" maxlength="20" aria-label="Your name"><button class="big" id="make" style="flex:0 0 auto">🎬 Make video</button></div>
+    </div>
+    <div class="col" id="s-video" hidden>
+      <div class="row"><button class="big" id="share">📤 Share video</button><button class="big alt" id="save">💾 Save</button></div>
+      <button class="big alt" id="back">← Change cracker / voice</button>
     </div>
   </div>
-  <div id="get-ui" hidden style="display:grid;gap:8px">
+  <div id="get-ui" class="col" hidden>
     <button class="big" id="light2">🔥 Light it!</button>
-    <a href="./" style="text-align:center">Make your own voice cracker →</a>
+    <a href="./">Make your own voice cracker →</a>
   </div>
 </main>
 <script>
-// shortcut: names/sounds are a first pass; real Marathi names to be confirmed by the user
+// shortcut: Marathi names are a best guess; swap here if your family calls them something else
 const CRACKERS = {
-  baan:    {emoji:'🚀', mr:'बाण',    en:'Rocket'},
-  bhuinala:{emoji:'🎇', mr:'भुईनळा', en:'Flower pot'},
-  lavangi: {emoji:'🧨', mr:'लवंगी',  en:'String pops'},
+  baan:     {emoji:'🚀', mr:'बाण'},
+  bhuinala: {emoji:'🎇', mr:'भुईनळा'},
+  lavangi:  {emoji:'🧨', mr:'लवंगी'},
+  sutli:    {emoji:'💣', mr:'सुतळी'},
+  chakra:   {emoji:'🌀', mr:'भुईचक्र'},
+  fulbaji:  {emoji:'✨', mr:'फुलबाजी'},
+  tikli:    {emoji:'🔴', mr:'टिकली'},
+  saap:     {emoji:'🐍', mr:'सापगोळी'},
+  skyshot:  {emoji:'🎆', mr:'स्काय शॉट'},
+  atom:     {emoji:'☢️', mr:'ॲटम बॉम्ब'},
 };
 const $ = s => document.querySelector(s);
-let type = 'baan', voice = null, voiceB64 = '', voiceMime = '';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let type = 'baan', voice = null, rev = null, who = '', video = null;
 
 // ---------- audio ----------
 let ac, out, noise;
@@ -75,13 +87,16 @@ function AC(){
   return ac;
 }
 function play(buf,t,dest,rate=1,off=0,dur){const s=ac.createBufferSource();s.buffer=buf;s.playbackRate.value=rate;s.connect(dest);s.start(t,off,dur);return s}
-function env(t,a,peak,hold,rel){const g=ac.createGain(),p=g.gain;p.setValueAtTime(0,t);p.linearRampToValueAtTime(peak,t+a);p.setValueAtTime(peak,t+a+hold);p.exponentialRampToValueAtTime(.001,t+a+hold+rel);g.connect(out);return g}
+function env(t,a,peak,hold,rel,dest=out){const g=ac.createGain(),p=g.gain;p.setValueAtTime(0,t);p.linearRampToValueAtTime(peak,t+a);p.setValueAtTime(peak,t+a+hold);p.exponentialRampToValueAtTime(.001,t+a+hold+rel);g.connect(dest);return g}
 function filt(type,f,q=1,to){const n=ac.createBiquadFilter();n.type=type;n.frequency.value=f;n.Q.value=q;if(to)n.connect(to);return n}
+function lfo(t,dur,hz,depth,param){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=hz;g.gain.value=depth;o.connect(g).connect(param);o.start(t);o.stop(t+dur)}
+function echo(time,fb,wet){const i=ac.createGain(),d=ac.createDelay(1),f=ac.createGain(),w=ac.createGain();d.delayTime.value=time;f.gain.value=fb;w.gain.value=wet;i.connect(out);i.connect(d);d.connect(f).connect(d);d.connect(w).connect(out);return i}
 function bang(t,size){
   play(noise,t,filt('lowpass',2500,1,env(t,.002,size,.01,.08+.3*size)),1,Math.random()*2,.6);
   const o=ac.createOscillator();o.frequency.setValueAtTime(140,t);o.frequency.exponentialRampToValueAtTime(40,t+.3);
   o.connect(env(t,.002,size*.9,0,.3));o.start(t);o.stop(t+.45);
 }
+function crackle(t,dur,n,size){for(let i=0;i<n;i++)bang(t+Math.random()*dur,size*(.5+Math.random()))}
 const at = (t,fn) => setTimeout(fn, Math.max(0,(t-ac.currentTime)*1000));
 
 // cut the silence around the voice so the sound lands on the beat
@@ -92,7 +107,9 @@ function trim(buf){
   const n=ac.createBuffer(1,Math.max(1,b-a),buf.sampleRate),nd=n.getChannelData(0),k=m>0?.9/m:1;
   for(let i=0;i<nd.length;i++)nd[i]=d[a+i]*k;return n;
 }
+function reversed(buf){const n=ac.createBuffer(1,buf.length,buf.sampleRate);n.getChannelData(0).set(buf.getChannelData(0).slice().reverse());return n}
 
+// each returns its total length in seconds
 const FX = {
   // voice rides the whistle upwards, then bursts
   baan(v,t){
@@ -100,78 +117,138 @@ const FX = {
     const w=filt('bandpass',700,3,env(t,.05,.5,fly-.1,.08));w.frequency.exponentialRampToValueAtTime(5000,t+fly);
     play(noise,t,w,1,0,fly+.2);
     const s=play(v,t+.05,env(t+.05,.03,1.1,fly-.1,.1),.85);s.playbackRate.linearRampToValueAtTime(1.6,t+fly);
-    const b=t+fly+.08;bang(b,1.2);
-    for(let i=0;i<14;i++)bang(b+.25+Math.random()*.9,.08+Math.random()*.1);
-    vis.rocket(t,fly);return fly+1.4;
+    bang(t+fly+.08,1.2);crackle(t+fly+.3,.9,14,.12);
+    vis.rocket(t,fly,.5,1);return fly+1.4;
   },
   // voice sprays out in a fizzing chorus
   bhuinala(v,t){
     const dur=Math.max(2.6,v.duration+1.2);
     play(noise,t,filt('highpass',2500,1,env(t,.3,.3,dur-.8,.5)),1,0,dur);
     [[0,1,1],[.09,1.07,.45],[.18,.93,.45]].forEach(([d,r,g])=>play(v,t+.25+d,filt('highpass',250,1,env(t+.25+d,.02,g,v.duration/r,.2)),r));
-    for(let i=0;i<40;i++)bang(t+.3+Math.random()*(dur-.6),.05+Math.random()*.06);
+    crackle(t+.3,dur-.6,40,.08);
     vis.fountain(t,dur);return dur+.3;
   },
   // voice chopped into a string of pops
   lavangi(v,t){
     const n=12,g=.09;let tt=t;
     for(let i=0;i<n;i++){
-      const off=(v.duration-g)*i/(n-1);
-      play(v,tt,env(tt,.003,1,g-.03,.03),1,Math.max(0,off),g);
-      bang(tt,.3+Math.random()*.2);vis.pop(tt,.5);
-      tt+=.08+Math.random()*.12;
+      play(v,tt,env(tt,.003,1,g-.03,.03),1,Math.max(0,(v.duration-g)*i/(n-1)),g);
+      bang(tt,.3+Math.random()*.2);vis.pop(tt,.5);tt+=.08+Math.random()*.12;
     }
     bang(tt+.1,1.3);play(v,tt+.1,env(tt+.1,.005,.9,v.duration,.1));vis.pop(tt+.1,1.6);
     return tt-t+v.duration+.5;
   },
+  // fuse hiss, then the voice comes out deep and huge
+  sutli(v,t){
+    const f=1.3;play(noise,t,filt('bandpass',4000,2,env(t,.05,.25,f-.1,.05)),1,0,f);crackle(t,f,10,.04);
+    const b=t+f;bang(b,1.8);
+    play(v,b,filt('lowpass',1400,1,env(b,.005,1.3,v.duration/.65,.2,echo(.22,.4,.5))),.65);
+    vis.fuse(t,f);vis.flash(b);vis.burst(b,.5,.8,1.4,30);return f+v.duration/.65+1.2;
+  },
+  // voice wobbles and spins left-right with a whirr
+  chakra(v,t){
+    const dur=Math.max(2.5,v.duration+.8),p=ac.createStereoPanner();p.connect(out);lfo(t,dur,3,1,p.pan);
+    const w=filt('bandpass',1800,4,env(t,.2,.35,dur-.5,.3,p));lfo(t,dur,7,700,w.frequency);play(noise,t,w,1,0,dur);
+    const s=play(v,t+.3,env(t+.3,.02,1,v.duration,.2,p));lfo(t,dur,8,.22,s.playbackRate);
+    vis.spin(t,dur);return dur+.3;
+  },
+  // soft sparkle with the voice echoing away
+  fulbaji(v,t){
+    const dur=v.duration+2.2;crackle(t,dur,70,.03);
+    play(noise,t,filt('highpass',6000,1,env(t,.3,.08,dur-.6,.3)),1,0,dur);
+    play(v,t+.3,filt('highpass',500,1,env(t+.3,.02,.85,v.duration,.2,echo(.18,.5,.6))));
+    vis.sparkler(t,dur);return dur+.5;
+  },
+  // tiny chipmunk caps
+  tikli(v,t){
+    const n=6,g=.12;
+    for(let i=0;i<n;i++){const tt=t+i*.28;play(v,tt,env(tt,.003,1,g,.04),1.7,Math.max(0,(v.duration-g*1.7)*i/(n-1)),g*1.7);bang(tt,.35);vis.pop(tt,.3)}
+    return n*.28+.4;
+  },
+  // voice melts slowly downwards like the snake grows
+  saap(v,t){
+    const dur=Math.min(4,v.duration/.5);
+    play(noise,t,filt('lowpass',500,1,env(t,.3,.4,dur,.4)),1,0,dur+.7);
+    const s=play(v,t+.1,filt('lowpass',1000,1,env(t+.1,.05,1.2,dur,.3)),.75);s.playbackRate.linearRampToValueAtTime(.4,t+dur);
+    vis.snake(t,dur+.3);return dur+.7;
+  },
+  // five shots, the voice climbing higher each time
+  skyshot(v,t){
+    const n=5,seg=Math.min(v.duration,.6);
+    for(let i=0;i<n;i++){const tt=t+i*.5;bang(tt,.25);play(v,tt+.05,env(tt+.05,.01,.9,seg,.08),.85+i*.18,0,seg);bang(tt+.42,.8);vis.rocket(tt,.4,.2+Math.random()*.6,.55)}
+    return n*.5+1;
+  },
+  // voice sucked in backwards, then the biggest boom
+  atom(v,t){
+    const r=rev||(rev=reversed(v)),b=t+v.duration;
+    play(r,t,env(t,v.duration*.9,1,0,.05));play(noise,t,filt('highpass',1500,1,env(t,v.duration,.2,0,.05)),1,0,v.duration);
+    bang(b,2.2);bang(b+.05,1.5);play(v,b+.05,filt('lowpass',2000,1,env(b+.05,.005,1.2,v.duration/.8,.3,echo(.3,.45,.6))),.8);
+    crackle(b+.3,1.2,20,.15);vis.flash(b);vis.burst(b,.5,.5,2.2,220);return v.duration*2.3+1.6;
+  },
 };
 function light(){
-  AC().resume();if(!voice)return;
-  const btns=document.querySelectorAll('#light1,#light2');btns.forEach(b=>b.disabled=true);
-  const d=FX[type](voice,ac.currentTime+.08);
-  setTimeout(()=>btns.forEach(b=>b.disabled=false),d*1000);
+  AC().resume();if(!voice)return 0;
+  const btns=document.querySelectorAll('#light1,#light2,#make');btns.forEach(b=>b.disabled=true);
+  const d=FX[type](voice,ac.currentTime+.3);
+  setTimeout(()=>btns.forEach(b=>b.disabled=false),(d+.3)*1000);
+  return d+.3;
 }
 
 // ---------- visuals ----------
-const cv=$('#sky'),cx=cv.getContext('2d');let P=[],idle=true;
-function fit(){const r=devicePixelRatio||1;cv.width=cv.clientWidth*r;cv.height=cv.clientHeight*r}
+const cv=$('#sky'),cx=cv.getContext('2d'),DPR=Math.min(2,devicePixelRatio||1);let P=[],idle=true,flash=0,bg;
+function fit(){
+  // even sizes keep video encoders happy
+  cv.width=Math.round(cv.clientWidth*DPR/2)*2;cv.height=Math.round(cv.clientHeight*DPR/2)*2;
+  bg=cx.createRadialGradient(cv.width/2,cv.height*1.2,0,cv.width/2,cv.height*1.2,cv.height*1.1);bg.addColorStop(0,'#3a1d4f');bg.addColorStop(1,'#0b0614');
+  cx.fillStyle=bg;cx.fillRect(0,0,cv.width,cv.height);
+}
 addEventListener('resize',fit);
-const HUES=[40,10,330,190,55,280];
-function spark(x,y,vx,vy,life,hue,g=.06){P.push({x,y,vx,vy,life,max:life,hue,g})}
+const HUES=[40,10,330,190,55,280],rnd=(a,b)=>a+Math.random()*(b-a);
+function spark(x,y,vx,vy,life,hue,g=.06,sat=100){P.push({x,y,vx,vy,life,max:life,hue,g,sat})}
+// run fn(k) every frame from t for dur seconds, k = 0..1
+function stream(t,dur,fn,end){at(t,()=>{idle=false;const f0=performance.now();
+  (function go(){const k=Math.min(1,(performance.now()-f0)/(dur*1000));fn(k,cv.width,cv.height);if(k<1)requestAnimationFrame(go);else end&&end()})()})}
 const vis={
-  rocket(t,fly){at(t,()=>{idle=false;const W=cv.width,H=cv.height,f0=performance.now();
-    (function up(){const k=Math.min(1,(performance.now()-f0)/(fly*1000)),x=W/2+Math.sin(k*6)*W*.04,y=H-(H*.7)*k;
-      for(let i=0;i<3;i++)spark(x,y,(Math.random()-.5)*1.5,2+Math.random()*2,25,40,0);
-      if(k<1)requestAnimationFrame(up);else{const h=HUES[Math.random()*6|0];
-        for(let i=0;i<160;i++){const a=Math.random()*7,s=Math.random()*9*devicePixelRatio;spark(x,y,Math.cos(a)*s,Math.sin(a)*s,60+Math.random()*40,h+Math.random()*30)}}})()})},
-  fountain(t,dur){at(t,()=>{idle=false;const f0=performance.now();
-    (function sp(){const W=cv.width,H=cv.height,s=devicePixelRatio;
-      for(let i=0;i<10;i++)spark(W/2,H-10,(Math.random()-.5)*5*s,-(6+Math.random()*7)*s,50+Math.random()*30,30+Math.random()*30,.18*s);
-      if(performance.now()-f0<dur*1000)requestAnimationFrame(sp)})()})},
-  pop(t,size){at(t,()=>{idle=false;const W=cv.width,H=cv.height,x=W*(.15+Math.random()*.7),y=H*(.6+Math.random()*.35),h=HUES[Math.random()*6|0];
-    for(let i=0;i<40*size;i++){const a=Math.random()*7,s=Math.random()*6*size*devicePixelRatio;spark(x,y,Math.cos(a)*s,Math.sin(a)*s,20+Math.random()*20,h,.1)}})},
+  burst(t,xf,yf,size,n=160){at(t,()=>{idle=false;const h=HUES[Math.random()*6|0],x=cv.width*xf,y=cv.height*yf;
+    for(let i=0;i<n*size;i++){const a=Math.random()*7,s=Math.random()*6*Math.sqrt(size)*DPR;spark(x,y,Math.cos(a)*s,Math.sin(a)*s,rnd(60,100),h+rnd(0,30))}})},
+  rocket(t,fly,xf,size){let x,y;stream(t,fly,(k,W,H)=>{x=W*xf+Math.sin(k*6)*W*.04;y=H-(H*.7)*k;
+    for(let i=0;i<3;i++)spark(x,y,rnd(-.7,.7),rnd(2,4),25,40,0)},()=>vis.burst(0,x/cv.width,y/cv.height,size))},
+  fountain(t,dur){stream(t,dur,(k,W,H)=>{for(let i=0;i<10;i++)spark(W/2,H-10,rnd(-2.5,2.5)*DPR,-rnd(6,13)*DPR,rnd(50,80),rnd(30,60),.18*DPR)})},
+  pop(t,size){at(t,()=>{vis.burst(0,rnd(.15,.85),rnd(.6,.95),size*.5,80)})},
+  fuse(t,dur){stream(t,dur,(k,W,H)=>{for(let i=0;i<4;i++)spark(W/2,H*.85,rnd(-2,2)*DPR,-rnd(1,4)*DPR,rnd(10,25),45,.15*DPR)})},
+  spin(t,dur){stream(t,dur,(k,W,H)=>{const a=k*dur*25,x=W/2+Math.cos(a)*W*.06,y=H*.8+Math.sin(a)*W*.03;
+    for(let i=0;i<8;i++)spark(x,y,-Math.sin(a)*rnd(4,9)*DPR,Math.cos(a)*rnd(2,5)*DPR,rnd(20,35),rnd(0,60),.08*DPR)})},
+  sparkler(t,dur){stream(t,dur,(k,W,H)=>{const x=W/2,y=H*(.35+k*.15);cx.strokeStyle='#777';cx.lineWidth=3*DPR;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x,H*.85);cx.stroke();
+    for(let i=0;i<6;i++){const a=Math.random()*7,s=rnd(1,5)*DPR;spark(x,y,Math.cos(a)*s,Math.sin(a)*s,rnd(8,18),50,.05,60)}})},
+  snake(t,dur){stream(t,dur,(k,W,H)=>{const x=W/2+Math.sin(k*14)*W*.12*k,y=H*.88-k*H*.5;
+    for(let i=0;i<3;i++)spark(x+rnd(-6,6)*DPR,y+rnd(-6,6)*DPR,0,0,rnd(150,220),30,0,8)})},
+  flash(t){at(t,()=>flash=1)},
 };
 (function draw(){
-  const W=cv.width,H=cv.height;
-  cx.globalCompositeOperation='source-over';cx.fillStyle='rgba(11,6,20,.28)';cx.fillRect(0,0,W,H);
-  if(idle||!P.length){cx.globalAlpha=.9;cx.font=`${H*.35}px serif`;cx.textAlign='center';cx.textBaseline='middle';
-    cx.fillText(CRACKERS[type].emoji,W/2,H/2+Math.sin(performance.now()/400)*6);cx.globalAlpha=1}
+  const W=cv.width,H=cv.height,c=CRACKERS[type];
+  cx.globalCompositeOperation='source-over';cx.globalAlpha=.3;cx.fillStyle=bg;cx.fillRect(0,0,W,H);cx.globalAlpha=1;
+  if(flash>.01){cx.fillStyle=`rgba(255,240,210,${flash})`;cx.fillRect(0,0,W,H);flash*=.86}
+  cx.textAlign='center';cx.textBaseline='middle';cx.fillStyle='#fff4e0';
+  if(idle){cx.globalAlpha=.9;cx.font=`${H*.3}px serif`;cx.fillText(c.emoji,W/2,H/2+Math.sin(performance.now()/400)*6);cx.globalAlpha=1}
+  // overlay text so the saved video says who sent it
+  cx.font=`700 ${W*.065}px system-ui,sans-serif`;cx.fillStyle='#ffb627';cx.fillText('🪔 शुभ दीपावली 🪔',W/2,H*.07);
+  cx.font=`600 ${W*.05}px system-ui,sans-serif`;cx.fillStyle='#fff4e0';cx.fillText(`${who?who+' चा ':''}${c.mr} ${c.emoji}`,W/2,H*.95);
   cx.globalCompositeOperation='lighter';
   P=P.filter(p=>p.life-->0);
   for(const p of P){p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.vx*=.985;
-    cx.fillStyle=`hsla(${p.hue},100%,${55+25*p.life/p.max}%,${p.life/p.max})`;cx.fillRect(p.x,p.y,2.5*devicePixelRatio,2.5*devicePixelRatio)}
-  if(!P.length)idle=true;
+    cx.fillStyle=`hsla(${p.hue},${p.sat}%,${55+25*p.life/p.max}%,${p.life/p.max})`;cx.fillRect(p.x,p.y,2.5*DPR,2.5*DPR)}
+  if(!P.length&&flash<.01)idle=true;
   requestAnimationFrame(draw);
 })();
 
-// ---------- recording ----------
+// ---------- recording voice ----------
 async function record(){
   AC().resume();
   let stream;
   try{stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}})}
   catch{msg('Mic blocked — allow microphone and try again');return}
   const mime=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'].find(m=>MediaRecorder.isTypeSupported(m))||'';
-  const r=new MediaRecorder(stream,{mimeType:mime,audioBitsPerSecond:12000}),chunks=[];
+  const r=new MediaRecorder(stream,{mimeType:mime}),chunks=[];
   r.ondataavailable=e=>chunks.push(e.data);
   const bar=$('#rec span');bar.style.transition='none';bar.style.transform='scaleX(0)';bar.offsetWidth;
   bar.style.transition='transform 2s linear';bar.style.transform='scaleX(1)';
@@ -179,43 +256,53 @@ async function record(){
   r.start();setTimeout(()=>r.stop(),2000);
   await new Promise(res=>r.onstop=res);stream.getTracks().forEach(t=>t.stop());
   bar.style.transition='none';bar.style.transform='scaleX(0)';$('#rec em').textContent='🎙 Record 2 sec';$('#rec').disabled=false;
-  const blob=new Blob(chunks,{type:r.mimeType});
-  try{await setVoice(blob)}catch{msg('Could not read that recording, try again');return}
-  voiceMime=r.mimeType.split(';')[0];
-  voiceB64=(await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(blob)}))
-    .split(',')[1].replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  $('#s-rec').hidden=true;$('#s-ready').hidden=false;msg('Nice! Light it to hear the cracker');light();
+  try{await setVoice(new Blob(chunks,{type:r.mimeType}))}catch{msg('Could not read that recording, try again');return}
+  show('s-ready');msg('Nice! Try other crackers, then make the video');light();
 }
-async function setVoice(blob){voice=trim(await AC().decodeAudioData(await blob.arrayBuffer()))}
+async function setVoice(blob){voice=trim(await AC().decodeAudioData(await blob.arrayBuffer()));rev=null}
 
-// ---------- share ----------
-async function send(){
-  const name=$('#name').value.trim();
-  // voice lives in the #hash, so nothing is uploaded anywhere
-  const p=new URLSearchParams({c:type,m:voiceMime,a:voiceB64});if(name)p.set('n',name);
-  const url=location.origin+location.pathname+'#'+p;
-  const c=CRACKERS[type],text=`🪔 ${name||'Someone'} sent you a voice ${c.mr} ${c.emoji}! Tap to light it:`;
-  if(navigator.share){try{await navigator.share({title:'Voice Fatake',text,url});return}catch(e){if(e.name==='AbortError')return}}
-  try{await navigator.clipboard.writeText(text+' '+url);msg('Link copied — paste it on WhatsApp!')}
-  catch{prompt('Copy this link:',url)}
+// ---------- video ----------
+async function makeVideo(){
+  const mime=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+  if(!mime||!cv.captureStream){msg('This browser can’t make videos — try Chrome or Safari');return}
+  who=$('#name').value.trim();AC().resume();
+  const dest=ac.createMediaStreamDestination();out.connect(dest);
+  const vt=cv.captureStream(30).getVideoTracks()[0],st=new MediaStream([vt,...dest.stream.getAudioTracks()]);
+  const r=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:3e6}),ch=[];r.ondataavailable=e=>ch.push(e.data);
+  $('#make').disabled=true;msg('🎬 Recording your video…');
+  r.start();await sleep(400);const d=light();await sleep(d*1000+300);
+  r.stop();await new Promise(res=>r.onstop=res);out.disconnect(dest);vt.stop();
+  const ext=mime.includes('mp4')?'mp4':'webm';
+  video=new File(ch,`diwali-${type}-${(who||'voice').replace(/\W+/g,'')||'voice'}.${ext}`,{type:mime.split(';')[0]});
+  show('s-video');msg(`Video ready (${(video.size/1e6).toFixed(1)} MB) 🎉`);
 }
+async function share(){
+  const text=`🪔 Happy Diwali! Make your own voice cracker: ${location.origin+location.pathname}`;
+  if(navigator.canShare?.({files:[video]})){try{await navigator.share({files:[video],text});return}catch(e){if(e.name==='AbortError')return}}
+  save();msg('Sharing not supported here — video saved, send it from your files');
+}
+function save(){const a=document.createElement('a');a.href=URL.createObjectURL(video);a.download=video.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5e3);msg('Saved 💾')}
 
 // ---------- ui ----------
 const msg=t=>$('#msg').textContent=t;
+function show(id){for(const s of ['s-rec','s-ready','s-video'])$('#'+s).hidden=s!==id;$('#crackers').hidden=id==='s-video'}
 for(const [k,c] of Object.entries(CRACKERS)){
-  const b=document.createElement('button');b.innerHTML=`<i>${c.emoji}</i><b>${c.mr}</b><small>${c.en}</small>`;
+  const b=document.createElement('button');b.innerHTML=`<i>${c.emoji}</i><b>${c.mr}</b>`;b.setAttribute('aria-label',c.mr);
   b.setAttribute('aria-pressed',k===type);
   b.onclick=()=>{type=k;document.querySelectorAll('#crackers button').forEach(x=>x.setAttribute('aria-pressed',x===b));if(voice)light()};
   $('#crackers').append(b);
 }
-$('#rec').onclick=record;$('#redo').onclick=()=>{$('#s-ready').hidden=true;$('#s-rec').hidden=false;record()};
-$('#light1').onclick=$('#light2').onclick=light;$('#send').onclick=send;
+$('#rec').onclick=record;$('#redo').onclick=()=>{show('s-rec');record()};
+$('#light1').onclick=$('#light2').onclick=light;$('#make').onclick=makeVideo;
+$('#share').onclick=share;$('#save').onclick=save;$('#back').onclick=()=>{show('s-ready');msg('Pick another cracker or redo your voice')};
+$('#name').oninput=e=>who=e.target.value.trim();
 
+// old links from the first version carry the voice in the #hash
 (async function receive(){
   const p=new URLSearchParams(location.hash.slice(1));if(!p.get('a'))return;
   $('#send-ui').hidden=true;$('#crackers').hidden=true;$('#get-ui').hidden=false;
-  type=CRACKERS[p.get('c')]?p.get('c'):'baan';const c=CRACKERS[type];
-  msg(`${p.get('n')||'Someone'} sent you a voice ${c.mr} ${c.emoji}`);
+  type=CRACKERS[p.get('c')]?p.get('c'):'baan';who=p.get('n')||'';const c=CRACKERS[type];
+  msg(`${who||'Someone'} sent you a voice ${c.mr} ${c.emoji}`);
   try{
     const bin=atob(p.get('a').replace(/-/g,'+').replace(/_/g,'/'));
     await setVoice(new Blob([Uint8Array.from(bin,ch=>ch.charCodeAt(0))],{type:p.get('m')||''}));
