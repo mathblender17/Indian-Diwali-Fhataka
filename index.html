@@ -60,7 +60,7 @@ a{color:var(--gold);text-align:center}
 <script>
 // shortcut: Marathi names are a best guess; swap here if your family calls them something else
 const CRACKERS = {
-  baan:     {emoji:'🚀', mr:'बाण'},
+  baan:     {emoji:'🚀', mr:'रॉकेट'},
   bhuinala: {emoji:'🎇', mr:'भुईनळा'},
   lavangi:  {emoji:'🧨', mr:'लवंगी'},
   sutli:    {emoji:'💣', mr:'सुतळी'},
@@ -73,129 +73,118 @@ const CRACKERS = {
 };
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let type = 'baan', voice = null, rev = null, who = '', video = null;
+const rnd = (a,b) => a+Math.random()*(b-a);
+let type = 'baan', voice = null, ons = [], who = '', video = null;
 
 // ---------- audio ----------
-let ac, out, noise;
+// voice goes on its own clean bus; crackers go through an outdoor-echo bus that ducks while you talk
+let ac, master, fx, vox, noise;
 function AC(){
   if(!ac){
     ac = new (window.AudioContext||webkitAudioContext)();
-    out = ac.createDynamicsCompressor(); out.connect(ac.destination);
+    master = ac.createDynamicsCompressor(); // used as a limiter so bangs never clip
+    master.threshold.value=-3; master.knee.value=0; master.ratio.value=20; master.attack.value=.001; master.release.value=.12;
+    master.connect(ac.destination);
+    vox = ac.createGain(); vox.connect(master);
+    fx = ac.createGain(); fx.connect(master);
+    const rv = ac.createConvolver(), n = ac.sampleRate*1.8, ir = ac.createBuffer(2,n,ac.sampleRate);
+    for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,4)}
+    rv.buffer = ir; const wet = ac.createGain(); wet.gain.value=.3; fx.connect(rv).connect(wet).connect(master);
     noise = ac.createBuffer(1, ac.sampleRate*3, ac.sampleRate);
     const d = noise.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
   }
   return ac;
 }
-function play(buf,t,dest,rate=1,off=0,dur){const s=ac.createBufferSource();s.buffer=buf;s.playbackRate.value=rate;s.connect(dest);s.start(t,off,dur);return s}
-function env(t,a,peak,hold,rel,dest=out){const g=ac.createGain(),p=g.gain;p.setValueAtTime(0,t);p.linearRampToValueAtTime(peak,t+a);p.setValueAtTime(peak,t+a+hold);p.exponentialRampToValueAtTime(.001,t+a+hold+rel);g.connect(dest);return g}
+function play(buf,t,dest,off=0,dur){const s=ac.createBufferSource();s.buffer=buf;s.connect(dest);s.start(t,off,dur);return s}
+function env(t,a,peak,hold,rel,dest=fx){const g=ac.createGain(),p=g.gain;p.setValueAtTime(0,t);p.linearRampToValueAtTime(peak,t+a);p.setValueAtTime(peak,t+a+hold);p.exponentialRampToValueAtTime(.001,t+a+hold+rel);g.connect(dest);return g}
 function filt(type,f,q=1,to){const n=ac.createBiquadFilter();n.type=type;n.frequency.value=f;n.Q.value=q;if(to)n.connect(to);return n}
-function lfo(t,dur,hz,depth,param){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=hz;g.gain.value=depth;o.connect(g).connect(param);o.start(t);o.stop(t+dur)}
-function echo(time,fb,wet){const i=ac.createGain(),d=ac.createDelay(1),f=ac.createGain(),w=ac.createGain();d.delayTime.value=time;f.gain.value=fb;w.gain.value=wet;i.connect(out);i.connect(d);d.connect(f).connect(d);d.connect(w).connect(out);return i}
-function bang(t,size){
-  play(noise,t,filt('lowpass',2500,1,env(t,.002,size,.01,.08+.3*size)),1,Math.random()*2,.6);
-  const o=ac.createOscillator();o.frequency.setValueAtTime(140,t);o.frequency.exponentialRampToValueAtTime(40,t+.3);
-  o.connect(env(t,.002,size*.9,0,.3));o.start(t);o.stop(t+.45);
+function hiss(t,dur,type,f,q,gain,a=.08){const n=filt(type,f,q,env(t,a,gain,Math.max(0,dur-a-.15),.15));play(noise,t,n,Math.random(),dur+.1);return n}
+function thump(t,size,f0=110){const o=ac.createOscillator();o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(35,t+.25);o.connect(env(t,.002,size,0,.08+.2*size));o.start(t);o.stop(t+.6)}
+// sharp broadband crack + low body; the reverb bus adds the outdoor echo
+function crack(t,size){play(noise,t,filt('highpass',350,.7,env(t,.001,size,.004,.04+.16*size)),Math.random()*2,.5);thump(t,size*.8)}
+function crackle(t,dur,n,size){for(let i=0;i<n;i++)crack(t+Math.random()*dur,size*rnd(.4,1))}
+// the voice itself: untouched, crackers duck under it
+function say(t,dest=vox){
+  play(voice,t,dest);const g=fx.gain;g.cancelScheduledValues(t);g.setTargetAtTime(.3,t,.03);g.setTargetAtTime(1,t+voice.duration,.1);
 }
-function crackle(t,dur,n,size){for(let i=0;i<n;i++)bang(t+Math.random()*dur,size*(.5+Math.random()))}
 const at = (t,fn) => setTimeout(fn, Math.max(0,(t-ac.currentTime)*1000));
 
-// cut the silence around the voice so the sound lands on the beat
+// cut the silence around the voice, keep soft starts like "sh"
 function trim(buf){
-  const d=buf.getChannelData(0);let m=0;for(const v of d)m=Math.max(m,Math.abs(v));
-  const th=m*.08;let a=0,b=d.length-1;while(a<b&&Math.abs(d[a])<th)a++;while(b>a&&Math.abs(d[b])<th)b--;
-  a=Math.max(0,a-400);b=Math.min(d.length,b+800);
-  const n=ac.createBuffer(1,Math.max(1,b-a),buf.sampleRate),nd=n.getChannelData(0),k=m>0?.9/m:1;
+  const d=buf.getChannelData(0),sr=buf.sampleRate;let m=0;for(const v of d)m=Math.max(m,Math.abs(v));
+  const th=m*.03;let a=0,b=d.length-1;while(a<b&&Math.abs(d[a])<th)a++;while(b>a&&Math.abs(d[b])<th)b--;
+  a=Math.max(0,a-sr*.05|0);b=Math.min(d.length,b+sr*.12|0);
+  const n=ac.createBuffer(1,Math.max(1,b-a),sr),nd=n.getChannelData(0),k=m>0?.95/m:1;
   for(let i=0;i<nd.length;i++)nd[i]=d[a+i]*k;return n;
 }
-function reversed(buf){const n=ac.createBuffer(1,buf.length,buf.sampleRate);n.getChannelData(0).set(buf.getChannelData(0).slice().reverse());return n}
+// syllable starts (seconds), so pops land on the words
+function onsets(buf){
+  const d=buf.getChannelData(0),n=buf.sampleRate*.02|0,r=[];
+  for(let i=0;i+n<=d.length;i+=n){let s=0;for(let j=i;j<i+n;j++)s+=d[j]*d[j];r.push(Math.sqrt(s/n))}
+  const m=Math.max(...r,1e-9),o=[0];let low=false;
+  for(let i=1;i<r.length;i++){if(r[i]<m*.15)low=true;else if(low&&r[i]>m*.3&&i*.02-o[o.length-1]>.15){o.push(i*.02);low=false}}
+  return o;
+}
 
-// each returns its total length in seconds
+// each returns its total length in seconds; V = voice length
 const FX = {
-  // voice rides the whistle upwards, then bursts
-  baan(v,t){
-    const fly=Math.min(2,Math.max(.8,v.duration/1.2));
-    const w=filt('bandpass',700,3,env(t,.05,.5,fly-.1,.08));w.frequency.exponentialRampToValueAtTime(5000,t+fly);
-    play(noise,t,w,1,0,fly+.2);
-    const s=play(v,t+.05,env(t+.05,.03,1.1,fly-.1,.1),.85);s.playbackRate.linearRampToValueAtTime(1.6,t+fly);
-    bang(t+fly+.08,1.2);crackle(t+fly+.3,.9,14,.12);
-    vis.rocket(t,fly,.5,1);return fly+1.4;
+  baan(t,V){ // whoosh while you talk, pop when you stop
+    const f=.3,w=hiss(t+f,V+.1,'bandpass',900,1.5,.5);w.frequency.exponentialRampToValueAtTime(3500,t+f+V);
+    hiss(t,f,'bandpass',5000,2,.15,.02);say(t+f);crack(t+f+V+.12,.9);crackle(t+f+V+.3,.5,6,.12);
+    vis.rocket(t,f,V+.12);return f+V+1.1;
   },
-  // voice sprays out in a fizzing chorus
-  bhuinala(v,t){
-    const dur=Math.max(2.6,v.duration+1.2);
-    play(noise,t,filt('highpass',2500,1,env(t,.3,.3,dur-.8,.5)),1,0,dur);
-    [[0,1,1],[.09,1.07,.45],[.18,.93,.45]].forEach(([d,r,g])=>play(v,t+.25+d,filt('highpass',250,1,env(t+.25+d,.02,g,v.duration/r,.2)),r));
-    crackle(t+.3,dur-.6,40,.08);
-    vis.fountain(t,dur);return dur+.3;
+  bhuinala(t,V){ // roaring spray around the voice
+    const d=V+.8;hiss(t,d,'bandpass',2600,.6,.55,.15);hiss(t,d,'highpass',6000,1,.2,.15);crackle(t+.2,d-.3,Math.round(d*10),.07);
+    say(t+.25);vis.fountain(t,d);return d+.5;
   },
-  // voice chopped into a string of pops
-  lavangi(v,t){
-    const n=12,g=.09;let tt=t;
-    for(let i=0;i<n;i++){
-      play(v,tt,env(tt,.003,1,g-.03,.03),1,Math.max(0,(v.duration-g)*i/(n-1)),g);
-      bang(tt,.3+Math.random()*.2);vis.pop(tt,.5);tt+=.08+Math.random()*.12;
-    }
-    bang(tt+.1,1.3);play(v,tt+.1,env(tt+.1,.005,.9,v.duration,.1));vis.pop(tt+.1,1.6);
-    return tt-t+v.duration+.5;
+  lavangi(t,V){ // a pop on every syllable, then the rest of the string
+    const s=t+.1;ons.forEach(o=>{crack(s+o-.04,.7);vis.pop(s+o-.04,.6)});crackle(s,V,Math.round(V*8),.15);say(s);
+    for(let i=0;i<7;i++){const tt=s+V+.05+i*rnd(.06,.13);crack(tt,rnd(.4,.8));vis.pop(tt,.5)}
+    vis.hold(t,V+1,(W,H)=>({e:'🧨',x:W/2,y:G(H),s:H*.1}));return V+1.2;
   },
-  // fuse hiss, then the voice comes out deep and huge
-  sutli(v,t){
-    const f=1.3;play(noise,t,filt('bandpass',4000,2,env(t,.05,.25,f-.1,.05)),1,0,f);crackle(t,f,10,.04);
-    const b=t+f;bang(b,1.8);
-    play(v,b,filt('lowpass',1400,1,env(b,.005,1.3,v.duration/.65,.2,echo(.22,.4,.5))),.65);
-    vis.fuse(t,f);vis.flash(b);vis.burst(b,.5,.8,1.4,30);return f+v.duration/.65+1.2;
+  sutli(t,V){ // fuse, BOOM, then you
+    const f=.9;hiss(t,f,'bandpass',5000,2,.25,.02);crackle(t,f,6,.04);
+    crack(t+f,1.6);thump(t+f,1.4,80);say(t+f+.08);
+    vis.fuse(t,f,'💣');vis.flash(t+f);vis.burst(t+f,.5,.75,1.4,80);return f+V+1.3;
   },
-  // voice wobbles and spins left-right with a whirr
-  chakra(v,t){
-    const dur=Math.max(2.5,v.duration+.8),p=ac.createStereoPanner();p.connect(out);lfo(t,dur,3,1,p.pan);
-    const w=filt('bandpass',1800,4,env(t,.2,.35,dur-.5,.3,p));lfo(t,dur,7,700,w.frequency);play(noise,t,w,1,0,dur);
-    const s=play(v,t+.3,env(t+.3,.02,1,v.duration,.2,p));lfo(t,dur,8,.22,s.playbackRate);
-    vis.spin(t,dur);return dur+.3;
+  chakra(t,V){ // whirr spinning around the voice
+    const d=V+.6,w=hiss(t,d,'bandpass',2200,3,.5,.1),o=ac.createOscillator(),g=ac.createGain();
+    o.frequency.value=9;g.gain.value=600;o.connect(g).connect(w.frequency);o.start(t);o.stop(t+d);
+    say(t+.2);vis.spin(t,d);return d+.4;
   },
-  // soft sparkle with the voice echoing away
-  fulbaji(v,t){
-    const dur=v.duration+2.2;crackle(t,dur,70,.03);
-    play(noise,t,filt('highpass',6000,1,env(t,.3,.08,dur-.6,.3)),1,0,dur);
-    play(v,t+.3,filt('highpass',500,1,env(t+.3,.02,.85,v.duration,.2,echo(.18,.5,.6))));
-    vis.sparkler(t,dur);return dur+.5;
+  fulbaji(t,V){ // soft sizzle
+    const d=V+.8;hiss(t,d,'highpass',4500,1,.22,.1);crackle(t,d,Math.round(d*20),.05);
+    say(t+.2);vis.sparkler(t,d);return d+.4;
   },
-  // tiny chipmunk caps
-  tikli(v,t){
-    const n=6,g=.12;
-    for(let i=0;i<n;i++){const tt=t+i*.28;play(v,tt,env(tt,.003,1,g,.04),1.7,Math.max(0,(v.duration-g*1.7)*i/(n-1)),g*1.7);bang(tt,.35);vis.pop(tt,.3)}
-    return n*.28+.4;
+  tikli(t,V){ // a cap snap on every syllable
+    const s=t+.1;ons.forEach(o=>{crack(s+o-.03,.45);vis.pop(s+o-.03,.35)});crack(s+V+.05,.45);say(s);
+    vis.hold(t,V+.4,(W,H)=>({e:'🔴',x:W/2,y:G(H),s:H*.07}));return V+.8;
   },
-  // voice melts slowly downwards like the snake grows
-  saap(v,t){
-    const dur=Math.min(4,v.duration/.5);
-    play(noise,t,filt('lowpass',500,1,env(t,.3,.4,dur,.4)),1,0,dur+.7);
-    const s=play(v,t+.1,filt('lowpass',1000,1,env(t+.1,.05,1.2,dur,.3)),.75);s.playbackRate.linearRampToValueAtTime(.4,t+dur);
-    vis.snake(t,dur+.3);return dur+.7;
+  saap(t,V){ // quiet fizz while the snake grows
+    const d=V+.6;hiss(t,d,'lowpass',1200,.7,.35,.2);say(t+.2);vis.snake(t,d);return d+.4;
   },
-  // five shots, the voice climbing higher each time
-  skyshot(v,t){
-    const n=5,seg=Math.min(v.duration,.6);
-    for(let i=0;i<n;i++){const tt=t+i*.5;bang(tt,.25);play(v,tt+.05,env(tt+.05,.01,.9,seg,.08),.85+i*.18,0,seg);bang(tt+.42,.8);vis.rocket(tt,.4,.2+Math.random()*.6,.55)}
-    return n*.5+1;
+  skyshot(t,V){ // a shell launches on every syllable, bursts after
+    const s=t+.1,shots=ons.length>2?ons:[0,V/3,V*2/3];
+    shots.forEach(o=>{thump(s+o-.05,.5,70);hiss(s+o-.05,.4,'bandpass',3000,1,.2,.01);crack(s+o+.4,.85);vis.shell(s+o-.05,.45)});
+    say(s);vis.hold(t,V+.9,(W,H)=>({f:box,x:W/2,y:G(H),s:H*.12}));return V+1.6;
   },
-  // voice sucked in backwards, then the biggest boom
-  atom(v,t){
-    const r=rev||(rev=reversed(v)),b=t+v.duration;
-    play(r,t,env(t,v.duration*.9,1,0,.05));play(noise,t,filt('highpass',1500,1,env(t,v.duration,.2,0,.05)),1,0,v.duration);
-    bang(b,2.2);bang(b+.05,1.5);play(v,b+.05,filt('lowpass',2000,1,env(b+.05,.005,1.2,v.duration/.8,.3,echo(.3,.45,.6))),.8);
-    crackle(b+.3,1.2,20,.15);vis.flash(b);vis.burst(b,.5,.5,2.2,220);return v.duration*2.3+1.6;
+  atom(t,V){ // long rumbling build, the biggest boom, then you
+    const f=1.1,r=hiss(t,f,'lowpass',120,1,.9,f-.2);r.frequency.linearRampToValueAtTime(600,t+f);hiss(t,f,'bandpass',5000,2,.2,.02);
+    crack(t+f,2);crack(t+f+.05,1.3);thump(t+f,1.6,60);say(t+f+.12);
+    vis.fuse(t,f,'☢️',true);vis.flash(t+f);vis.burst(t+f,.5,.7,2,200);return f+V+1.6;
   },
 };
 function light(){
   AC().resume();if(!voice)return 0;
   const btns=document.querySelectorAll('#light1,#light2,#make');btns.forEach(b=>b.disabled=true);
-  const d=FX[type](voice,ac.currentTime+.3);
-  setTimeout(()=>btns.forEach(b=>b.disabled=false),(d+.3)*1000);
-  return d+.3;
+  const d=FX[type](ac.currentTime+.3,voice.duration)+.3;
+  setTimeout(()=>btns.forEach(b=>b.disabled=false),d*1000);
+  return d;
 }
 
 // ---------- visuals ----------
-const cv=$('#sky'),cx=cv.getContext('2d'),DPR=Math.min(2,devicePixelRatio||1);let P=[],idle=true,flash=0,bg;
+const cv=$('#sky'),cx=cv.getContext('2d'),DPR=Math.min(2,devicePixelRatio||1);let P=[],objs=[],busy=0,flash=0,bg;
+const G=H=>H*.84; // ground line, above the caption
 function fit(){
   // even sizes keep video encoders happy
   cv.width=Math.round(cv.clientWidth*DPR/2)*2;cv.height=Math.round(cv.clientHeight*DPR/2)*2;
@@ -203,41 +192,61 @@ function fit(){
   cx.fillStyle=bg;cx.fillRect(0,0,cv.width,cv.height);
 }
 addEventListener('resize',fit);
-const HUES=[40,10,330,190,55,280],rnd=(a,b)=>a+Math.random()*(b-a);
+const HUES=[40,10,330,190,55,280];
 function spark(x,y,vx,vy,life,hue,g=.06,sat=100){P.push({x,y,vx,vy,life,max:life,hue,g,sat})}
-// run fn(k) every frame from t for dur seconds, k = 0..1
-function stream(t,dur,fn,end){at(t,()=>{idle=false;const f0=performance.now();
-  (function go(){const k=Math.min(1,(performance.now()-f0)/(dur*1000));fn(k,cv.width,cv.height);if(k<1)requestAnimationFrame(go);else end&&end()})()})}
+// run fn(k,W,H) every frame from t for dur seconds, k = 0..1
+function stream(t,dur,fn,end){at(t,()=>{busy++;const f0=performance.now();
+  (function go(){const k=Math.min(1,(performance.now()-f0)/(dur*1000));fn(k,cv.width,cv.height);if(k<1)requestAnimationFrame(go);else{busy--;end&&end()}})()})}
+// shapes for crackers that have no good emoji
+function pot(s){cx.fillStyle='#d23b2b';cx.beginPath();cx.moveTo(-s*.35,s*.5);cx.lineTo(s*.35,s*.5);cx.lineTo(s*.14,-s*.5);cx.lineTo(-s*.14,-s*.5);cx.fill();
+  cx.fillStyle='#ffb627';cx.fillRect(-s*.27,s*.05,s*.54,s*.14);cx.fillStyle='#8a5a2b';cx.fillRect(-s*.15,-s*.56,s*.3,s*.08)}
+function box(s){cx.fillStyle='#c62f3f';cx.fillRect(-s*.55,-s*.35,s*1.1,s*.7);cx.fillStyle='#ffb627';cx.fillRect(-s*.55,-s*.08,s*1.1,s*.16);
+  cx.fillStyle='#3a1a10';for(let i=0;i<4;i++)cx.fillRect(-s*.45+i*s*.26,-s*.42,s*.16,s*.1)}
+function stick(s){cx.strokeStyle='#8c8c8c';cx.lineWidth=s*.05;cx.beginPath();cx.moveTo(0,0);cx.lineTo(0,s*1.6);cx.stroke();
+  cx.fillStyle='#fff3c0';cx.beginPath();cx.arc(0,0,s*.07,0,7);cx.fill()}
 const vis={
-  burst(t,xf,yf,size,n=160){at(t,()=>{idle=false;const h=HUES[Math.random()*6|0],x=cv.width*xf,y=cv.height*yf;
+  hold(t,dur,mk){stream(t,dur,(k,W,H)=>objs.push(mk(W,H,k)))},
+  burst(t,xf,yf,size,n=160){at(t,()=>{const h=HUES[Math.random()*6|0],x=cv.width*xf,y=cv.height*yf;
     for(let i=0;i<n*size;i++){const a=Math.random()*7,s=Math.random()*6*Math.sqrt(size)*DPR;spark(x,y,Math.cos(a)*s,Math.sin(a)*s,rnd(60,100),h+rnd(0,30))}})},
-  rocket(t,fly,xf,size){let x,y;stream(t,fly,(k,W,H)=>{x=W*xf+Math.sin(k*6)*W*.04;y=H-(H*.7)*k;
-    for(let i=0;i<3;i++)spark(x,y,rnd(-.7,.7),rnd(2,4),25,40,0)},()=>vis.burst(0,x/cv.width,y/cv.height,size))},
-  fountain(t,dur){stream(t,dur,(k,W,H)=>{for(let i=0;i<10;i++)spark(W/2,H-10,rnd(-2.5,2.5)*DPR,-rnd(6,13)*DPR,rnd(50,80),rnd(30,60),.18*DPR)})},
-  pop(t,size){at(t,()=>{vis.burst(0,rnd(.15,.85),rnd(.6,.95),size*.5,80)})},
-  fuse(t,dur){stream(t,dur,(k,W,H)=>{for(let i=0;i<4;i++)spark(W/2,H*.85,rnd(-2,2)*DPR,-rnd(1,4)*DPR,rnd(10,25),45,.15*DPR)})},
-  spin(t,dur){stream(t,dur,(k,W,H)=>{const a=k*dur*25,x=W/2+Math.cos(a)*W*.06,y=H*.8+Math.sin(a)*W*.03;
-    for(let i=0;i<8;i++)spark(x,y,-Math.sin(a)*rnd(4,9)*DPR,Math.cos(a)*rnd(2,5)*DPR,rnd(20,35),rnd(0,60),.08*DPR)})},
-  sparkler(t,dur){stream(t,dur,(k,W,H)=>{const x=W/2,y=H*(.35+k*.15);cx.strokeStyle='#777';cx.lineWidth=3*DPR;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x,H*.85);cx.stroke();
-    for(let i=0;i<6;i++){const a=Math.random()*7,s=rnd(1,5)*DPR;spark(x,y,Math.cos(a)*s,Math.sin(a)*s,rnd(8,18),50,.05,60)}})},
-  snake(t,dur){stream(t,dur,(k,W,H)=>{const x=W/2+Math.sin(k*14)*W*.12*k,y=H*.88-k*H*.5;
+  rocket(t,f,fly){ // stands on the ground while the fuse burns, then climbs
+    vis.hold(t,f,(W,H)=>({e:'🚀',x:W/2,y:G(H),s:H*.11,r:-Math.PI/4}));
+    stream(t,f,(k,W,H)=>spark(W/2,G(H)+H*.04,rnd(-1,1)*DPR,-rnd(0,2)*DPR,12,45,.1));
+    let x,y;stream(t+f,fly,(k,W,H)=>{x=W/2+Math.sin(k*5)*W*.03;y=G(H)-(H*.62)*k*k*(3-2*k);
+      objs.push({e:'🚀',x,y,s:H*.11,r:-Math.PI/4});for(let i=0;i<4;i++)spark(x,y+H*.05,rnd(-.8,.8),rnd(2,4),25,40,0)},
+      ()=>vis.burst(0,x/cv.width,y/cv.height,1))},
+  shell(t,fly){let x,xf=rnd(.2,.8),y;stream(t,fly,(k,W,H)=>{x=W*xf;y=G(H)-H*.1-H*.5*k;for(let i=0;i<3;i++)spark(x,y,rnd(-.5,.5),rnd(1,3),18,40,0)},
+    ()=>vis.burst(0,xf,y/cv.height,.7))},
+  fountain(t,dur){stream(t,dur,(k,W,H)=>{const s=H*.13;objs.push({f:pot,x:W/2,y:G(H),s});
+    for(let i=0;i<12;i++)spark(W/2,G(H)-s*.55,rnd(-2.2,2.2)*DPR,-rnd(6,12)*DPR,rnd(50,80),rnd(30,60),.18*DPR)})},
+  pop(t,size){at(t,()=>vis.burst(0,rnd(.3,.7),rnd(.68,.82),size*.5,80))},
+  fuse(t,dur,e,shake){stream(t,dur,(k,W,H)=>{const s=H*.13,j=shake?rnd(-1,1)*k*6*DPR:0;objs.push({e,x:W/2+j,y:G(H)-s*.1+j,s});
+    for(let i=0;i<4;i++)spark(W/2+s*.3,G(H)-s*.55,rnd(-2,2)*DPR,-rnd(1,4)*DPR,rnd(10,25),45,.15*DPR)})},
+  spin(t,dur){stream(t,dur,(k,W,H)=>{const a=k*dur*25,s=H*.1,x=W/2,y=G(H);objs.push({e:'🌀',x,y,s,r:a});
+    for(let i=0;i<8;i++){const b=a+i*.8;spark(x+Math.cos(b)*s*.45,y+Math.sin(b)*s*.45,-Math.sin(b)*rnd(4,9)*DPR,Math.cos(b)*rnd(3,7)*DPR,rnd(20,35),rnd(0,60),.08*DPR)}})},
+  sparkler(t,dur){stream(t,dur,(k,W,H)=>{const s=H*.28,x=W/2,y=H*.32+k*s*.5;objs.push({f:stick,x,y,s:s*(1-k*.3)});
+    for(let i=0;i<7;i++){const a=Math.random()*7,v=rnd(1,5)*DPR;spark(x,y,Math.cos(a)*v,Math.sin(a)*v,rnd(8,18),50,.05,60)}})},
+  snake(t,dur){stream(t,dur,(k,W,H)=>{const x=W/2+Math.sin(k*14)*W*.12*k,y=G(H)-k*H*.5;
+    objs.push({e:'⚫',x:W/2,y:G(H),s:H*.05});objs.push({e:'🐍',x,y,s:H*.08});
     for(let i=0;i<3;i++)spark(x+rnd(-6,6)*DPR,y+rnd(-6,6)*DPR,0,0,rnd(150,220),30,0,8)})},
   flash(t){at(t,()=>flash=1)},
 };
 (function draw(){
   const W=cv.width,H=cv.height,c=CRACKERS[type];
   cx.globalCompositeOperation='source-over';cx.globalAlpha=.3;cx.fillStyle=bg;cx.fillRect(0,0,W,H);cx.globalAlpha=1;
-  if(flash>.01){cx.fillStyle=`rgba(255,240,210,${flash})`;cx.fillRect(0,0,W,H);flash*=.86}
-  cx.textAlign='center';cx.textBaseline='middle';cx.fillStyle='#fff4e0';
-  if(idle){cx.globalAlpha=.9;cx.font=`${H*.3}px serif`;cx.fillText(c.emoji,W/2,H/2+Math.sin(performance.now()/400)*6);cx.globalAlpha=1}
-  // overlay text so the saved video says who sent it
-  cx.font=`700 ${W*.065}px system-ui,sans-serif`;cx.fillStyle='#ffb627';cx.fillText('🪔 शुभ दीपावली 🪔',W/2,H*.07);
-  cx.font=`600 ${W*.05}px system-ui,sans-serif`;cx.fillStyle='#fff4e0';cx.fillText(`${who?who+' चा ':''}${c.mr} ${c.emoji}`,W/2,H*.95);
+  cx.textAlign='center';cx.textBaseline='middle';
+  if(!busy&&!P.length&&flash<.01){cx.globalAlpha=.9;cx.font=`${H*.3}px serif`;cx.fillText(c.emoji,W/2,H/2+Math.sin(performance.now()/400)*6);cx.globalAlpha=1}
   cx.globalCompositeOperation='lighter';
   P=P.filter(p=>p.life-->0);
   for(const p of P){p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.vx*=.985;
     cx.fillStyle=`hsla(${p.hue},${p.sat}%,${55+25*p.life/p.max}%,${p.life/p.max})`;cx.fillRect(p.x,p.y,2.5*DPR,2.5*DPR)}
-  if(!P.length&&flash<.01)idle=true;
+  // the cracker itself, drawn solid on top of its sparks
+  cx.globalCompositeOperation='source-over';
+  for(const o of objs){cx.save();cx.translate(o.x,o.y);cx.rotate(o.r||0);if(o.e){cx.font=`${o.s}px serif`;cx.fillText(o.e,0,0)}else o.f(o.s);cx.restore()}
+  objs=[];
+  if(flash>.01){cx.fillStyle=`rgba(255,240,210,${flash})`;cx.fillRect(0,0,W,H);flash*=.86}
+  // overlay text so the saved video says who sent it
+  cx.font=`700 ${W*.065}px system-ui,sans-serif`;cx.fillStyle='#ffb627';cx.fillText('🪔 शुभ दीपावली 🪔',W/2,H*.07);
+  cx.font=`600 ${W*.05}px system-ui,sans-serif`;cx.fillStyle='#fff4e0';cx.fillText(`${who?who+' चा ':''}${c.mr} ${c.emoji}`,W/2,H*.95);
   requestAnimationFrame(draw);
 })();
 
@@ -245,10 +254,11 @@ const vis={
 async function record(){
   AC().resume();
   let stream;
-  try{stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}})}
+  // no browser processing: it garbles short clips
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
   catch{msg('Mic blocked — allow microphone and try again');return}
   const mime=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'].find(m=>MediaRecorder.isTypeSupported(m))||'';
-  const r=new MediaRecorder(stream,{mimeType:mime}),chunks=[];
+  const r=new MediaRecorder(stream,{mimeType:mime,audioBitsPerSecond:128000}),chunks=[];
   r.ondataavailable=e=>chunks.push(e.data);
   const bar=$('#rec span');bar.style.transition='none';bar.style.transform='scaleX(0)';bar.offsetWidth;
   bar.style.transition='transform 2s linear';bar.style.transform='scaleX(1)';
@@ -259,19 +269,19 @@ async function record(){
   try{await setVoice(new Blob(chunks,{type:r.mimeType}))}catch{msg('Could not read that recording, try again');return}
   show('s-ready');msg('Nice! Try other crackers, then make the video');light();
 }
-async function setVoice(blob){voice=trim(await AC().decodeAudioData(await blob.arrayBuffer()));rev=null}
+async function setVoice(blob){voice=trim(await AC().decodeAudioData(await blob.arrayBuffer()));ons=onsets(voice)}
 
 // ---------- video ----------
 async function makeVideo(){
   const mime=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
   if(!mime||!cv.captureStream){msg('This browser can’t make videos — try Chrome or Safari');return}
   who=$('#name').value.trim();AC().resume();
-  const dest=ac.createMediaStreamDestination();out.connect(dest);
+  const dest=ac.createMediaStreamDestination();master.connect(dest);
   const vt=cv.captureStream(30).getVideoTracks()[0],st=new MediaStream([vt,...dest.stream.getAudioTracks()]);
-  const r=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:3e6}),ch=[];r.ondataavailable=e=>ch.push(e.data);
+  const r=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:3e6,audioBitsPerSecond:128000}),ch=[];r.ondataavailable=e=>ch.push(e.data);
   $('#make').disabled=true;msg('🎬 Recording your video…');
   r.start();await sleep(400);const d=light();await sleep(d*1000+300);
-  r.stop();await new Promise(res=>r.onstop=res);out.disconnect(dest);vt.stop();
+  r.stop();await new Promise(res=>r.onstop=res);master.disconnect(dest);vt.stop();
   const ext=mime.includes('mp4')?'mp4':'webm';
   video=new File(ch,`diwali-${type}-${(who||'voice').replace(/\W+/g,'')||'voice'}.${ext}`,{type:mime.split(';')[0]});
   show('s-video');msg(`Video ready (${(video.size/1e6).toFixed(1)} MB) 🎉`);
